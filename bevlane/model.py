@@ -335,9 +335,9 @@ class IPMSegNetV3(nn.Module):
         x3 = self.layer3(x2)
         x4 = self.layer4(x3)
         f = self.lat2(x2) \
-            + F.interpolate(self.lat3(x3), scale_factor=2, mode="bilinear",
+            + F.interpolate(self.lat3(x3), size=x2.shape[-2:], mode="bilinear",
                             align_corners=False) \
-            + F.interpolate(self.lat4(x4), scale_factor=4, mode="bilinear",
+            + F.interpolate(self.lat4(x4), size=x2.shape[-2:], mode="bilinear",
                             align_corners=False)
         f = self.fuse(f)
         feats = f.view(B, N, *f.shape[1:])

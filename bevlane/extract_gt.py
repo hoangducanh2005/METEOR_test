@@ -135,7 +135,9 @@ def process_scene(args):
                 cams[ch] = img_name
             if skip:
                 continue
-            manifest.append({"frame": fi, "gt": gt_name, "imgs": cams})
+            manifest.append({"frame": fi, "sample_token": s["token"],
+                             "timestamp": s.get("timestamp"),
+                             "gt": gt_name, "imgs": cams})
 
         json.dump({"scene": scene, "bev_res": BEV_RES, "bev_size": BEV_H,
                    "bev_h": BEV_H, "bev_w": BEV_W,

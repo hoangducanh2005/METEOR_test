@@ -23,7 +23,8 @@ def run(cmd):
     return r.returncode, (r.stdout + r.stderr)[-400:]
 
 
-def convert_scene(scene):
+def convert_scene(task):
+    scene, stride = task
     try:
         prod = f"{B}/out/production/{scene}"
         if not os.path.exists(f"{prod}/bev_label_masked.npy"):
@@ -36,34 +37,34 @@ def convert_scene(scene):
             if rc:
                 return f"[fail-vec] {scene}: {out[-150:]}"
         stages = [
-            [PY, "bevlane/extract_gt.py", "--scenes", scene, "--stride", "2",
+            [PY, "bevlane/extract_gt.py", "--scenes", scene, "--stride", str(stride),
              "--workers", "1"],
             [PY, "-c", "import sys,os;sys.path.insert(0,'.');"
              "os.environ['BEVLANE_ROOT']=r'%s/out/allroot';"
              "from bevlane.add_narrow_cams import process_scene;"
-             "print(process_scene(('%s',2)))" % (B, scene)],
+             "print(process_scene(('%s',%d)))" % (B, scene, stride)],
             [PY, "bevlane/render_vector_gt.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_depth_dense.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_depth_narrow.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_bev_box.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/annotate_gtcov.py", "--scenes", scene,
              "--workers", "1"],
             [PY, "bevlane/extract_seg2d.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_bbox2d.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_ego.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_occ.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_agent_traj.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_tl.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_risk.py", "--scenes", scene,
              "--workers", "1"],
             [PY, "bevlane/annotate_indoor.py", "--scenes", scene,
@@ -75,7 +76,7 @@ def convert_scene(scene):
             [PY, "bevlane/extract_lanegraph.py", "--scenes", scene,
              "--workers", "1"],
             [PY, "bevlane/extract_lidar_bev.py", "--scenes", scene,
-             "--stride", "2", "--workers", "1"],
+             "--stride", str(stride), "--workers", "1"],
         ]
         for st in stages:
             rc, out = run(st)
@@ -95,12 +96,17 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--scenes", required=True, help="file with scene names")
     ap.add_argument("--workers", type=int, default=10)
+    ap.add_argument("--stride", type=int, default=2,
+                    help="sample stride propagated to every downstream stage")
     args = ap.parse_args()
+    if args.stride < 1:
+        ap.error("--stride must be >= 1")
     scenes = open(args.scenes).read().split()
     print(f"{len(scenes)} scenes, {args.workers} workers", flush=True)
     ok = fail = 0
     with ProcessPoolExecutor(max_workers=args.workers) as ex:
-        for i, r in enumerate(ex.map(convert_scene, scenes)):
+        for i, r in enumerate(ex.map(convert_scene,
+                                     [(scene, args.stride) for scene in scenes])):
             ok += r.startswith("[ok]")
             fail += not r.startswith("[ok]")
             if i % 10 == 0 or not r.startswith("[ok]"):

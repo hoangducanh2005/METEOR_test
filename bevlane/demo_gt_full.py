@@ -10,6 +10,7 @@ E2E GT (green trajectory waypoints, v0/steer/accel/brake gauges).
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 
@@ -56,12 +57,44 @@ def main():
     ap.add_argument("--frame-stride", type=int, default=1,
                     help="sample every Nth manifest frame (dataset-wide overview)")
     ap.add_argument("--scenes-file", help="read scene list from a file instead")
+    ap.add_argument("--frames-dir",
+                    help="also write one 1920x1080 PNG montage per rendered frame")
+    ap.add_argument("--require-segmentation", action="store_true",
+                    help="fail before rendering if any seg2d21 camera view is missing")
     args = ap.parse_args()
     if args.scenes_file:
         args.scenes = [s for s in open(args.scenes_file).read().split() if s]
     if not args.scenes:
         ap.error("provide --scenes or --scenes-file")
+    if args.require_segmentation:
+        errors = []
+        for scene in args.scenes:
+            root = f"out/bevlane/{scene}"
+            man = json.load(open(f"{root}/manifest.json"))
+            for f in man["frames"][::args.frame_stride]:
+                relative = f.get("seg2d21")
+                if not relative:
+                    errors.append(f"{scene} frame={f['frame']}: missing seg2d21 key")
+                    continue
+                try:
+                    candidate = np.load(f"{root}/" + relative)["seg"]
+                except Exception as exc:
+                    errors.append(f"{scene} frame={f['frame']}: cannot decode seg2d21: {exc}")
+                    continue
+                if candidate.shape != (8, 108, 192):
+                    errors.append(f"{scene} frame={f['frame']}: seg shape={candidate.shape}")
+                    continue
+                for camera_index, channel in enumerate(CAM8):
+                    # SEG arrays use the CAMS order, which differs from display order.
+                    ci = CAMS.index(channel)
+                    if np.all(candidate[ci] == 255):
+                        errors.append(f"{scene} frame={f['frame']} camera={channel}: all ignored")
+        if errors:
+            raise SystemExit("FAIL: missing seg2d21\n" + "\n".join(errors[:40]))
     VW, VH = 1920, 1080
+    os.makedirs(os.path.dirname(args.out) or ".", exist_ok=True)
+    if args.frames_dir:
+        os.makedirs(args.frames_dir, exist_ok=True)
     raw = args.out.replace(".mp4", "_raw.mp4")
     vw = cv2.VideoWriter(raw, cv2.VideoWriter_fourcc(*"mp4v"), args.fps, (VW, VH))
     n = 0
@@ -277,14 +310,28 @@ def main():
             cv2.putText(frame, f"{scene.split('+0900_')[-1]}  f{fi:03d}  |  "
                         "GROUND TRUTH (all 8 tasks)", (740, VH - 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.62, (0, 255, 0), 1, cv2.LINE_AA)
+            if f.get("timestamp") is not None:
+                cv2.putText(frame, f"timestamp_us={f['timestamp']}", (740, VH - 16),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.44, (180, 180, 180), 1,
+                            cv2.LINE_AA)
+            if args.frames_dir:
+                frame_name = f"{n:04d}_{scene}_f{fi:04d}.png"
+                cv2.imwrite(os.path.join(args.frames_dir, frame_name), frame)
             vw.write(frame)
             n += 1
         print(f"scene {scene} done ({n} frames total)", flush=True)
     vw.release()
-    subprocess.run(["ffmpeg", "-y", "-i", raw, "-c:v", "libx264", "-crf", "24",
-                    "-pix_fmt", "yuv420p", args.out], check=True,
-                   capture_output=True)
-    os.remove(raw)
+    if shutil.which("ffmpeg"):
+        subprocess.run(["ffmpeg", "-y", "-i", raw, "-c:v", "libx264", "-crf", "24",
+                        "-pix_fmt", "yuv420p", args.out], check=True,
+                       capture_output=True)
+        os.remove(raw)
+    else:
+        # OpenCV's mp4v file is a valid MP4 deliverable. H.264 is preferred
+        # when ffmpeg is available, but a missing optional transcoder must not
+        # discard or fail an otherwise complete render.
+        os.replace(raw, args.out)
+        print("ffmpeg not found; kept OpenCV mp4v output", flush=True)
     print("done", n, args.out, flush=True)
 
 

@@ -1,0 +1,16 @@
+Metadata-Version: 2.4
+Name: pnk-comet-autolabel
+Version: 0.1.0
+Summary: PNK raw to T4Dataset adapter and open-source 2D autolabel runner for METEOR
+Requires-Python: >=3.11
+Requires-Dist: laspy[lazrs]>=2.5
+Requires-Dist: numpy<3,>=1.26
+Requires-Dist: opencv-python-headless>=4.10
+Requires-Dist: pillow>=10
+Requires-Dist: pycocotools>=2.0.7
+Provides-Extra: mask2former
+Requires-Dist: accelerate>=1.0; extra == "mask2former"
+Requires-Dist: safetensors>=0.4; extra == "mask2former"
+Requires-Dist: torch>=2.4; extra == "mask2former"
+Requires-Dist: torchvision>=0.19; extra == "mask2former"
+Requires-Dist: transformers>=4.45; extra == "mask2former"
