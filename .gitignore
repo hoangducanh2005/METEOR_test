@@ -4,6 +4,7 @@ out/
 *.pth
 *.onnx
 *.engine
+*.pnk_e2e
 
 # media (README media under docs/media/ is tracked explicitly)
 *.mp4
