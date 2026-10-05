@@ -1,0 +1,4 @@
+models/*
+!models/.gitkeep
+**/__pycache__/
+*.py[cod]

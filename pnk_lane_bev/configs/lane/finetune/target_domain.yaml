@@ -1,0 +1,22 @@
+schema_version: 1
+status: READY_FOR_LABELS
+annotation_contract:
+  format: jsonl
+  fields: [image, camera, width, height, lanes]
+  lane_fields: [points, category, visibility]
+splits:
+  train_manifest: data/lane_target/train.jsonl
+  validation_manifest: data/lane_target/validation.jsonl
+models:
+  ufld_v2:
+    base_config: configs/lane/ufld/culane_res18.yaml
+    base_checkpoint: null
+    output_checkpoint: null
+  clrnet:
+    base_config: configs/lane/clrnet/culane_res18.yaml
+    base_checkpoint: null
+    output_checkpoint: null
+notes:
+  - Fill checkpoint and manifest paths at run time; source code contains no fixed training path.
+  - Split by scene/time before training to prevent adjacent-frame leakage.
+

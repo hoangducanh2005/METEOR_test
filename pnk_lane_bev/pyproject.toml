@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pnk-lane-bev"
+version = "0.1.0"
+description = "Six-camera drivable/lane inference and calibrated IPM fusion for PNKData"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=1.26,<3",
+  "opencv-python-headless>=4.10",
+  "pillow>=10",
+  "pyyaml>=6",
+  "torch>=2.4",
+  "torchvision>=0.19",
+  "transformers>=4.45",
+  "safetensors>=0.4",
+  "accelerate>=1.0",
+]
+
+[project.optional-dependencies]
+models = ["gdown>=5.2"]
+
+[project.scripts]
+pnk-lane-bev = "pnk_lane_bev.cli:main"
+pnk-mask2former-bev = "pnk_lane_bev.unified_cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

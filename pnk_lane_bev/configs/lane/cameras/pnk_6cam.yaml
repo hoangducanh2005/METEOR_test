@@ -1,0 +1,52 @@
+schema_version: 1
+canonical_image_wh: [768, 432] 
+calibration_policy: raw_image_plus_Calib_2_intrinsics
+fusion:
+  lane_threshold: 0.20
+  denominator: active_lane_support
+  confidence_power: 1.0
+  distance_reliability:
+    near_m: 5.0
+    far_m: 60.0
+    minimum: 0.10
+
+# The values are isolated here so ROI, threshold and camera availability can be
+# calibrated without code changes. Weight zero excludes a camera from BEV lane
+# fusion but it is still inferred and included in the per-camera benchmark.
+cameras:
+  CAM_FRONT_WIDE:
+    source_channel: CAM_P_F
+    enabled: true
+    roi_normalized: [0.0, 0.0, 1.0, 1.0]
+    reliability_weight: 0.75
+    confidence_threshold: {ufld_v2: 0.55, ufld_v2_res34: 0.55, clrnet: 0.55}
+  CAM_FRONT_LEFT:
+    source_channel: CAM_P_FL
+    enabled: false
+    roi_normalized: [0.0, 0.0, 1.0, 1.0]
+    reliability_weight: 0.0
+    confidence_threshold: {ufld_v2: 0.60, ufld_v2_res34: 0.60, clrnet: 0.60}
+  CAM_FRONT_RIGHT:
+    source_channel: CAM_P_FR
+    enabled: false
+    roi_normalized: [0.0, 0.0, 1.0, 1.0]
+    reliability_weight: 0.0
+    confidence_threshold: {ufld_v2: 0.60, ufld_v2_res34: 0.60, clrnet: 0.60}
+  CAM_BACK_WIDE:
+    source_channel: CAM_P_B
+    enabled: true
+    roi_normalized: [0.0, 0.0, 1.0, 1.0]
+    reliability_weight: 1.0
+    confidence_threshold: {ufld_v2: 0.50, ufld_v2_res34: 0.50, clrnet: 0.50}
+  CAM_BACK_LEFT:
+    source_channel: CAM_P_LB
+    enabled: true
+    roi_normalized: [0.0, 0.0, 1.0, 1.0]
+    reliability_weight: 0.15
+    confidence_threshold: {ufld_v2: 0.60, ufld_v2_res34: 0.60, clrnet: 0.60}
+  CAM_BACK_RIGHT:
+    source_channel: CAM_P_RB
+    enabled: false
+    roi_normalized: [0.0, 0.0, 1.0, 1.0]
+    reliability_weight: 0.0
+    confidence_threshold: {ufld_v2: 0.60, ufld_v2_res34: 0.60, clrnet: 0.60}

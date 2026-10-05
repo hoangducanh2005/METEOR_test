@@ -1,0 +1,14 @@
+detector: clrnet
+architecture: ResNet-18
+training_domain: CULane
+checkpoint: pnk_lane_bev/models/culane_r18.pth
+checkpoint_configurable: true
+input_wh: [800, 320]
+proposal_threshold: 0.40
+nms_threshold: 50
+max_lanes: 4
+fine_tune:
+  train_manifest: null
+  validation_manifest: null
+  output_checkpoint: null
+

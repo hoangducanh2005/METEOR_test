@@ -1,0 +1,58 @@
+schema_version: 1
+model:
+  name: facebook/mask2former-swin-large-mapillary-vistas-panoptic
+  task: panoptic
+  local_cache_dir: out/pnk_e2e/hf_cache
+
+# Names must match model.config.id2label. They are resolved case-insensitively.
+taxonomy:
+  drivable_classes:
+    - Road
+    - Service Lane
+    - Bike Lane
+    - Parking
+    - Crosswalk - Plain
+    - Lane Marking - General
+    - Lane Marking - Crosswalk
+  lane_classes:
+    - Lane Marking - General
+    - Lane Marking - Crosswalk
+
+postprocess:
+  lane:
+    close_kernel: 3
+    open_kernel: 1
+    min_component_pixels: 12
+    skeletonize: false
+
+fusion:
+  drivable_threshold: 0.45
+  lane_threshold: 0.45
+  semantic_confidence_floor: 0.05
+  formula: confidence_weighted_mean
+
+cameras:
+  CAM_FRONT_WIDE:
+    enabled: true
+    reliability_weight: 1.00
+    lane_confidence_threshold: 0.70
+  CAM_FRONT_LEFT:
+    enabled: true
+    reliability_weight: 0.85
+    lane_confidence_threshold: 0.70
+  CAM_FRONT_RIGHT:
+    enabled: true
+    reliability_weight: 0.85
+    lane_confidence_threshold: 0.70
+  CAM_BACK_WIDE:
+    enabled: true
+    reliability_weight: 1.00
+    lane_confidence_threshold: 0.70
+  CAM_BACK_LEFT:
+    enabled: true
+    reliability_weight: 0.70
+    lane_confidence_threshold: 0.72
+  CAM_BACK_RIGHT:
+    enabled: true
+    reliability_weight: 0.70
+    lane_confidence_threshold: 0.72

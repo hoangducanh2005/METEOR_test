@@ -80,6 +80,9 @@ paper/
 # Claude Code session data
 .claude/
 
+# Temporary upstream source checkout used to port the CLRNet inference adapter.
+third_party/CLRNet/
+
 # internal ledgers, plans and reports carry accuracy figures measured on the internal
 # validation set -- not published (decision 2026-09-08)
 docs/ROADMAP.md

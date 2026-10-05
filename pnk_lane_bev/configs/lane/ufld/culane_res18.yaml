@@ -1,0 +1,11 @@
+detector: ufld_v2
+architecture: ResNet-18
+training_domain: CULane
+checkpoint: pnk_lane_bev/models/culane_res18.pth
+checkpoint_configurable: true
+input_wh: [1600, 320]
+fine_tune:
+  train_manifest: null
+  validation_manifest: null
+  output_checkpoint: null
+

@@ -1,0 +1,12 @@
+detector: ufld_v2_res34
+architecture: UFLD-v2
+backbone: ResNet-34
+training_domain: CULane
+checkpoint: pnk_lane_bev/models/culane_res34.pth
+checkpoint_source: https://drive.google.com/file/d/1AjnvAD3qmqt_dGPveZJsLZ1bOyWv62Yj/view
+checkpoint_configurable: true
+input_wh: [1600, 320]
+fine_tune:
+  train_manifest: null
+  validation_manifest: null
+  output_checkpoint: null
