@@ -3074,12 +3074,9 @@ class DepthSegIPMNetV29(DepthSegIPMNetV28):
     def flow_loss(flow, boxes, nbox, traj, tvalid):
         """target: per-cell ego-frame velocity of the covering agent box
         (traj[0]/0.5 s); stationary boxes supervise (0,0)."""
-        import cv2
         import numpy as np
+        from bevlane.flow_targets import build_flow_target
         B = flow.shape[0]
-        # The occupancy/flow window is +-40 m at 0.4 m -> 200x200, but a
-        # rear-truncated grid gives the head fewer rows (the crop is clamped in
-        # bev_rows), so build the target at whatever the prediction actually is.
         FH, FW = int(flow.shape[-2]), int(flow.shape[-1])
         tgt = np.zeros((B, 2, FH, FW), np.float32)
         msk = np.zeros((B, 1, FH, FW), np.float32)
@@ -3087,25 +3084,10 @@ class DepthSegIPMNetV29(DepthSegIPMNetV28):
         tj = traj.detach().cpu().numpy()
         tv = tvalid.detach().cpu().numpy()
         for b in range(B):
-            for k2 in range(int(nbox[b])):
-                cls, xe, ye, l, w, yaw = bx[b, k2]
-                if l <= 0 or abs(xe) > 42 or abs(ye) > 42:
-                    continue
-                vx = vy = 0.0
-                if tv[b, k2, 0] > 0.5:
-                    vx, vy = tj[b, k2, 0] / 0.5
-                c, s = np.cos(yaw), np.sin(yaw)
-                pts = []
-                for lx, wy in ((l / 2, w / 2), (l / 2, -w / 2),
-                               (-l / 2, -w / 2), (-l / 2, w / 2)):
-                    px = xe + lx * c - wy * s
-                    py = ye + lx * s + wy * c
-                    pts.append([int((40 - py) / 0.4), int((40 - px) / 0.4)])
-                mm = np.zeros((FH, FW), np.uint8)
-                cv2.fillPoly(mm, [np.array(pts, np.int32).reshape(-1, 1, 2)], 1)
-                tgt[b, 0][mm > 0] = vx
-                tgt[b, 1][mm > 0] = vy
-                msk[b, 0][mm > 0] = 1
+            flow_np, mask_np = build_flow_target(
+                bx[b], int(nbox[b]), tj[b], tv[b], FH, FW)
+            tgt[b] = flow_np
+            msk[b, 0] = mask_np
         tgt_t = torch.from_numpy(tgt).to(flow.device)
         msk_t = torch.from_numpy(msk).to(flow.device)
         if msk_t.sum() == 0:

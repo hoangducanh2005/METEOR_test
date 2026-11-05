@@ -294,7 +294,13 @@ def export_panoptic(scene_dir: Path, cache_dir: Path) -> dict:
 
 
 def export_reference_boxes(scene_dir: Path) -> dict:
-    """Temporary 3D bridge for flow testing; labels remain explicit reference provenance."""
+    """Temporary 3D bridge for flow testing; labels remain explicit reference provenance.
+
+    Preprocessing note: this bridge currently transforms the original box yaw as
+    supplied. It does not consume the separate world-frame heading audit or
+    resolve the front/back branch. Keep source labels read-only; see
+    docs/DATA_PIPELINE.md before treating exported rotations as directional.
+    """
     manifest = json.loads((scene_dir / "run_manifest.json").read_text(encoding="utf-8"))
     instances: dict[str, dict] = {}
     annotations = []

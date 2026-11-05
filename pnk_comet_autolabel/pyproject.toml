@@ -28,6 +28,8 @@ mask2former = [
 
 [project.scripts]
 pnk-autolabel = "pnk_comet_autolabel.cli:main"
+pnk-lidar-bev = "pnk_comet_autolabel.bev_visualizer:main"
+pnk-preprocess-top = "pnk_comet_autolabel.sensor_preprocessing:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

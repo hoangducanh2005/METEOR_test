@@ -63,6 +63,7 @@ def convert_scene(task):
              "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_agent_traj.py", "--scenes", scene,
              "--stride", str(stride), "--workers", "1"],
+            [PY, "bevlane/extract_occ_flow.py", "--scenes", scene],
             [PY, "bevlane/extract_tl.py", "--scenes", scene,
              "--stride", str(stride), "--workers", "1"],
             [PY, "bevlane/extract_risk.py", "--scenes", scene,

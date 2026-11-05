@@ -1,81 +1,102 @@
-# METEOR — CoMET Replacement Autolabel Pilot
+# METEOR Autolabeling on PNKData
 
-Repo này là fork từ [TIER IV / METEOR](https://github.com/tier4/METEOR). Phần bổ sung trong fork thay upstream CoMET bằng pipeline mã nguồn mở, với mục tiêu kiểm tra thông luồng:
+An end-to-end autolabeling pilot for this [TIER IV METEOR](https://github.com/tier4/METEOR) fork. The pilot replaces the unavailable CoMET implementation with an open-source camera segmentation model and a PNK-to-T4Dataset adapter, then passes the generated annotations through the METEOR Autolabel Factory.
+
+> **Scope:** this is an integration and data-flow demonstration. It is not a benchmark proving annotation accuracy or complete coverage of all METEOR tasks.
+
+## Visual results
+
+The frame below is from the integrated `LIDAR_TOP` run. It combines camera segmentation and object overlays with depth, BEV, occupancy, and track visualizations.
+
+![Integrated PNKData autolabel output showing camera overlays, BEV, depth, occupancy, and tracks](docs/media/pnk_top_e2e_frame.png)
+
+This is one rendered sample from the run. The renderer uses the label “GROUND TRUTH” for its task-target panels; that label does not mean the outputs were independently verified against ground truth.
+
+### LiDAR and camera evidence
+
+| Top-down LiDAR view from a separate labeled PNK frame (`1772718324-099732876`) | 3D-to-camera projection review from the integrated run |
+|---|---|
+| ![Top-down LiDAR point cloud with labeled 3D box footprints](docs/media/pnk_lidar_top_bev.png) | ![PNK 3D boxes projected onto a camera image for calibration review](docs/media/pnk_camera_projection_review.jpg) |
+
+The projection image is a visual calibration check and shows residual alignment error. Treat it as review evidence, not as a validated camera-LiDAR calibration result.
+
+An earlier 71-frame pilot video is available here: [Watch the MP4 demo](docs/media/pnk_comet_replacement_demo.mp4). The image above and the run metrics below refer to the later `LIDAR_TOP` integration run.
+
+## Pipeline
 
 ```text
 PNK raw data
-  → CoMET replacement
-  → general-purpose annotations
-  → METEOR Autolabel Factory
-  → METEOR training smoke test
+  ├─ Camera RGB ──> Mask2Former Swin-L ──> 2D panoptic pseudo-labels ─┐
+  └─ LiDAR_TOP + NAV + Calib_2 ──> deskew / time alignment ──────────┤
+       PNK reference 3D boxes + heading audit ───────────────────────┘
+                                  │
+                                  ▼
+                  Taxonomy mapping + T4Dataset adapter
+                                  │
+                                  ▼
+             General annotations: surface_ann, object_ann,
+                                  sample_annotation
+                                  │
+                                  ▼
+                   METEOR Autolabel Factory
+                                  │
+                                  ├─> Task targets and occupancy-flow export
+                                  ├─> Training handoff smoke check
+                                  └─> Per-frame visualizations and MP4
 ```
 
-## Kết quả trực quan
+## Technology and responsibilities
 
-[![PNK autolabel và METEOR Factory preview](docs/media/pnk_comet_replacement_preview.png)](docs/media/pnk_comet_replacement_demo.mp4)
+| Component | Role in this pilot |
+|---|---|
+| [Mask2Former Swin-L, Mapillary Vistas](https://huggingface.co/facebook/mask2former-swin-large-mapillary-vistas-panoptic) | Runs on camera RGB and produces 2D semantic/panoptic predictions. It does not process LiDAR. |
+| PNK preprocessing | Deskews `LIDAR_TOP` using per-point timestamps and NAV poses, aligns scans to labeled timestamps, and records camera health/synchronization evidence. |
+| PNK reference annotations | Supply the 3D boxes. The pilot audits/resolves heading where supported; it does **not** run CenterPoint. |
+| T4Dataset adapter | Maps model and reference-label outputs into the schema METEOR consumes. |
+| METEOR Autolabel Factory | Converts general-purpose annotations into downstream task targets, including the occupancy-flow export in this run. |
+| OpenCV renderer | Writes per-frame visualization images and encodes them into an MP4. |
 
-**[▶ Xem video MP4 đầy đủ — 71 frame, 1920×1080, 5 FPS](docs/media/pnk_comet_replacement_demo.mp4)**
+## Integrated run
 
-Video được tạo bằng renderer có sẵn của METEOR: mỗi frame tổng hợp camera segmentation, 2D boxes, depth, BEV, occupancy và trajectory thành một ảnh; OpenCV ghép 71 ảnh thành MP4. Không cần web app. Đây là hình trực quan của GT/pseudo-GT sau Autolabel Factory, không phải video prediction từ checkpoint đã train.
+**Session:** `20260301_1429_VF6_01_1772350177_1772350814`<br>
+**Label segment:** `290_1772350499_1772350516`<br>
+**Raw data:** `D:\mentor_data\PNKData\20260301_1429_VF6_01_1772350177_1772350814`
 
-## Pipeline autolabel
+| Evidence | Result |
+|---|---:|
+| `LIDAR_TOP` scans deskewed | 170 / 170 |
+| Labeled samples | 86 |
+| Camera views processed by Mask2Former | 688 / 688 |
+| Views flagged as possible freeze | 252 / 688 |
+| Views marked usable for cross-modal checks | 436 / 688 |
+| General annotations: `surface_ann` | 4,695 |
+| General annotations: `object_ann` | 9,132 |
+| General annotations: `sample_annotation` | 10,364 |
+| Occupancy-flow targets | 86 frames; 88,325 supervised BEV cells |
+| Training handoff smoke check | Completed; no validation split was available |
 
-```mermaid
-flowchart LR
-    A[PNK raw<br/>8 RGB cameras + LiDAR] --> B[Đồng bộ timestamp<br/>calibration + T4Dataset staging]
-    B --> C[Mask2Former<br/>2D panoptic segmentation]
-    B --> D[3D annotation bridge<br/>flow test]
-    C --> E[Taxonomy mapper<br/>T4Dataset adapter]
-    D --> E
-    E --> F[General-purpose annotations<br/>surface_ann · object_ann · sample_annotation]
-    F --> G[METEOR Autolabel Factory]
-    G --> H[Task-specific GT<br/>segmentation · depth · BEV · occupancy · trajectory]
-    H --> I[METEOR train smoke]
-    H --> J[PNG frames + MP4]
-```
+The 3D annotations come from the PNK reference labels. The training smoke check verifies that data reaches the trainer; it is not a model-quality evaluation. No independent 2D ground truth was available for accuracy metrics on this session.
 
-### Tech stack và vai trò
+## Reproduce the run
 
-| Thành phần | Vai trò | Output |
-|---|---|---|
-| [Mask2Former Swin-L Mapillary Vistas](https://huggingface.co/facebook/mask2former-swin-large-mapillary-vistas-panoptic) | Chạy panoptic segmentation trên từng ảnh camera; tách `stuff` và `thing` | `surface_ann`, `object_ann` |
-| PyTorch + Transformers + CUDA | Runtime inference Mask2Former trên GPU | Panoptic masks và class/instance IDs |
-| Custom PNK reader, taxonomy mapper và T4Dataset adapter | Đồng bộ camera–LiDAR, đổi calibration, map class và ghi schema METEOR đọc được | T4Dataset scene + general-purpose annotations |
-| 3D reference bridge | Dùng 3D boxes có sẵn để kiểm tra trọn luồng schema/factory/train | `sample_annotation` |
-| METEOR Autolabel Factory | Chuyển general-purpose annotations thành supervision cho các task | `seg2d21`, depth, BEV, occupancy, boxes, trajectory |
-| OpenCV renderer | Ghép các panel đầu ra thành PNG và mã hóa chuỗi frame thành MP4 | Video demo phía trên |
-| METEOR `v3s` | Kiểm tra dataset do pipeline sinh có thể đi vào trainer | Checkpoint sau một optimizer step |
-
-> **Segmentation là bắt buộc trong flow test này.** Pipeline kiểm tra đủ `568/568` camera views ở cả annotation T4Dataset và output `seg2d21` của METEOR Factory; thiếu segmentation thì runner dừng.
-
-## Dữ liệu đã chạy
-
-- Raw folder: `D:\mentor_data\PNKData\20260301_1443_VF6_01_1772350996_1772351781`
-- Phạm vi: 71 LiDAR keyframes × 8 pinhole cameras = 568 ảnh; bỏ qua 4 fisheye cameras.
-- Mask2Former: 9,147 panoptic annotations, gồm 4,512 `surface_ann` và 4,635 `object_ann`.
-- 3D flow bridge: 9,038 `sample_annotation`, 686 instances.
-- METEOR Factory: 71/71 frame hoàn tất; segmentation gate đạt 568/568 views.
-- Train smoke: model `v3s`, batch 1, một optimizer step, checkpoint hợp lệ.
-
-Trạng thái pilot: **`PASS_WITH_3D_REFERENCE_BRIDGE`**.
-
-### Giới hạn hiện tại
-
-CenterPoint/MMDetection3D chưa chạy trong pilot Windows này. `sample_annotation` hiện lấy từ 3D labels có sẵn và được đánh dấu provenance là `reference_3d_bridge_for_e2e_flow_test`; kết quả chỉ chứng minh luồng dữ liệu 3D tương thích. Bước tiếp theo để đánh giá chất lượng 3D autolabel là thay bridge bằng CenterPoint inference.
-
-## Chạy lại
-
-Sau khi tạo môi trường theo [hướng dẫn của package](pnk_comet_autolabel/README.md):
+After setting up the environment described in the [PNK runner guide](pnk_top_autolabel/README.md), run:
 
 ```powershell
-.\pnk_comet_autolabel\run_pilot.ps1
+& .\pnk_top_autolabel\run_full.ps1
 ```
 
-Runner thực hiện tuần tự: preflight → T4Dataset staging → Mask2Former → annotation export → validation → METEOR Factory → segmentation gate → PNG/MP4 → train smoke.
+The default run uses the session and label segment listed above. It reads `LIDAR_TOP`, the eight available camera streams, NAV poses, and the date-matched `Calib_2`. Raw sensor files and source labels are not modified.
 
-## Tài liệu
+## Repository guides
 
-- [Implementation plan](docs/COMET_REPLACEMENT_IMPLEMENTATION_PLAN.md)
-- [Dataset overview và các vấn đề cần xử lý](docs/DATASET_OVERVIEW.md)
-- [Runner/package guide](pnk_comet_autolabel/README.md)
-- [METEOR upstream chính chủ](https://github.com/tier4/METEOR)
+- [PNK preprocessing and autolabel summary](docs/PNK_PREPROCESSING_AUTOLABEL_SUMMARY.md)
+- [Dataset overview](docs/DATASET_OVERVIEW.md)
+- [PNK runner guide](pnk_top_autolabel/README.md)
+- [METEOR upstream repository](https://github.com/tier4/METEOR)
+
+## Current limitations
+
+- CoMET source code is not available in this repository; this pilot uses an open-source replacement.
+- PNK 3D reference boxes are passed through the adapter; CenterPoint inference has not been evaluated here.
+- Camera/LiDAR calibration still needs further validation. Some views are flagged for possible freeze and are not suitable as reliable cross-modal evidence.
+- Generated annotations are pseudo-labels. The run verifies the pipeline and schema handoff, not accuracy against independent ground truth or full completion of all METEOR task labels.
