@@ -4,6 +4,12 @@ This fork explores an open-source replacement for CoMET and validates how genera
 
 > **Scope:** the NavSim preview below demonstrates Mask2Former image inference and LiDAR visualization. It does not claim that nuScenes was converted to T4Dataset or processed by the METEOR Autolabel Factory.
 
+## Autolabel pipeline
+
+The diagram below shows the end-to-end autolabel pipeline implemented in this fork: raw PNK data is preprocessed, camera images are labeled with Mask2Former Swin-L, annotations are adapted to T4Dataset, and METEOR's Autolabel Factory generates task-specific labels.
+
+![Autolabel pipeline from PNK raw data through preprocessing, Mask2Former, the T4Dataset adapter, and the METEOR Autolabel Factory](slide1.png)
+
 ## NavSim / nuScenes visual run
 
 Starting image: `n008-2018-08-01-15-16-36-0400__CAM_FRONT__1533151353262404.jpg`<br>
