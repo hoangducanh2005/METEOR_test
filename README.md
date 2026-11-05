@@ -1,66 +1,83 @@
-# METEOR Autolabeling on PNKData
+# METEOR Autolabeling
 
-An end-to-end autolabeling pilot for this [TIER IV METEOR](https://github.com/tier4/METEOR) fork. The pilot replaces the unavailable CoMET implementation with an open-source camera segmentation model and a PNK-to-T4Dataset adapter, then passes the generated annotations through the METEOR Autolabel Factory.
+This fork explores an open-source replacement for CoMET and validates how generated annotations can enter the [TIER IV METEOR](https://github.com/tier4/METEOR) pipeline. The repository contains a PNKData end-to-end integration run and a newer camera visualization run using nuScenes data from the NavSim workflow.
 
-> **Scope:** this is an integration and data-flow demonstration. It is not a benchmark proving annotation accuracy or complete coverage of all METEOR tasks.
+> **Scope:** the NavSim preview below demonstrates Mask2Former image inference and LiDAR visualization. It does not claim that nuScenes was converted to T4Dataset or processed by the METEOR Autolabel Factory.
 
-## Visual results
+## NavSim / nuScenes visual run
 
-The frame below is from the integrated `LIDAR_TOP` run. It combines camera segmentation and object overlays with depth, BEV, occupancy, and track visualizations.
+Starting image: `n008-2018-08-01-15-16-36-0400__CAM_FRONT__1533151353262404.jpg`<br>
+Dataset root: `D:\nuscenes`<br>
+Model: **Mask2Former Swin-L, Mapillary Vistas Panoptic**
 
-![Integrated PNKData autolabel output showing camera overlays, BEV, depth, occupancy, and tracks](docs/media/pnk_top_e2e_frame.png)
+The contact sheet shows the six nuScenes camera views nearest to the requested timestamp, with Mask2Former panoptic overlays. Its multi-panel surround-view layout is inspired by the public [METEOR demo](https://github.com/tier4/METEOR); the six-camera layout follows the available nuScenes sensors and does not fabricate METEOR's two additional camera views.
 
-This is one rendered sample from the run. The renderer uses the label “GROUND TRUTH” for its task-target panels; that label does not mean the outputs were independently verified against ground truth.
+![Mask2Former panoptic overlays on six synchronized nuScenes camera views](docs/media/navsim_n008_6cam_panoptic.png)
 
-### LiDAR and camera evidence
-
-| Top-down LiDAR view from a separate labeled PNK frame (`1772718324-099732876`) | 3D-to-camera projection review from the integrated run |
+| CAM_FRONT prediction | Raw LIDAR_TOP BEV |
 |---|---|
-| ![Top-down LiDAR point cloud with labeled 3D box footprints](docs/media/pnk_lidar_top_bev.png) | ![PNK 3D boxes projected onto a camera image for calibration review](docs/media/pnk_camera_projection_review.jpg) |
+| ![CAM_FRONT image with Mask2Former panoptic overlay](docs/media/navsim_n008_cam_front_panoptic.png) | ![Top-down view of the nearest raw nuScenes LIDAR_TOP scan](docs/media/navsim_n008_lidar_bev.png) |
 
-The projection image is a visual calibration check and shows residual alignment error. Treat it as review evidence, not as a validated camera-LiDAR calibration result.
+The LiDAR scan is **34.7 ms** from the CAM_FRONT anchor. The BEV shows raw points in the LiDAR sensor frame; it has no projected 3D boxes or lane labels.
 
-An earlier 71-frame pilot video is available here: [Watch the MP4 demo](docs/media/pnk_comet_replacement_demo.mp4). The image above and the run metrics below refer to the later `LIDAR_TOP` integration run.
+**[Watch the CAM_FRONT raw-to-panoptic video](docs/media/navsim_n008_cam_front_panoptic.mp4)** — 15 rendered frames at 5 FPS, sampled around the requested timestamp. The run inferred 12 unique camera images across the six-camera anchor and short front-camera sequence.
 
-## Pipeline
+### What this run establishes
+
+- Mask2Former inference completed on six cameras at the anchor timestamp and on nearby CAM_FRONT frames.
+- The nearest camera timestamps are within **35.0 ms** of the requested CAM_FRONT timestamp.
+- The run used the local CUDA environment and cached checkpoint `facebook/mask2former-swin-large-mapillary-vistas-panoptic`.
+- No independent image labels were evaluated, so the segment counts and overlays are visual evidence, not accuracy metrics.
+- This preview stops at camera panoptic output and raw LiDAR visualization. It does not run the T4Dataset adapter, METEOR Autolabel Factory, or METEOR training.
+
+To reproduce it in the prepared environment:
+
+```powershell
+$env:PYTHONPATH = (Join-Path (Get-Location) 'pnk_comet_autolabel\src')
+$env:HF_HOME = (Join-Path (Get-Location) 'out\pnk_e2e\hf_cache')
+& '.\pnk_comet_autolabel\.venv\Scripts\python.exe' `
+  '.\navsim_visuals\run_mask2former_preview.py' --device cuda
+```
+
+The [NavSim preview runner](navsim_visuals/run_mask2former_preview.py) and local run artifacts in the ignored `navsim_visuals/output/` directory make this visualization reproducible.
+
+## PNKData end-to-end integration run
+
+The PNK pilot demonstrates the broader replacement path from raw sensors through the METEOR Autolabel Factory. CoMET source code is not present in the public METEOR repository, so this fork uses an open-source camera segmentation model and a custom PNK-to-T4Dataset adapter.
 
 ```text
 PNK raw data
   ├─ Camera RGB ──> Mask2Former Swin-L ──> 2D panoptic pseudo-labels ─┐
-  └─ LiDAR_TOP + NAV + Calib_2 ──> deskew / time alignment ──────────┤
+  └─ LiDAR_TOP + NAV + Calib_2 ──> deskew / timestamp alignment ─────┤
        PNK reference 3D boxes + heading audit ───────────────────────┘
                                   │
                                   ▼
                   Taxonomy mapping + T4Dataset adapter
                                   │
                                   ▼
-             General annotations: surface_ann, object_ann,
-                                  sample_annotation
+             surface_ann · object_ann · sample_annotation
                                   │
                                   ▼
                    METEOR Autolabel Factory
                                   │
                                   ├─> Task targets and occupancy-flow export
                                   ├─> Training handoff smoke check
-                                  └─> Per-frame visualizations and MP4
+                                  └─> Frame visualizations and MP4
 ```
 
-## Technology and responsibilities
-
-| Component | Role in this pilot |
+| Component | Role in the PNK pilot |
 |---|---|
-| [Mask2Former Swin-L, Mapillary Vistas](https://huggingface.co/facebook/mask2former-swin-large-mapillary-vistas-panoptic) | Runs on camera RGB and produces 2D semantic/panoptic predictions. It does not process LiDAR. |
-| PNK preprocessing | Deskews `LIDAR_TOP` using per-point timestamps and NAV poses, aligns scans to labeled timestamps, and records camera health/synchronization evidence. |
-| PNK reference annotations | Supply the 3D boxes. The pilot audits/resolves heading where supported; it does **not** run CenterPoint. |
-| T4Dataset adapter | Maps model and reference-label outputs into the schema METEOR consumes. |
-| METEOR Autolabel Factory | Converts general-purpose annotations into downstream task targets, including the occupancy-flow export in this run. |
-| OpenCV renderer | Writes per-frame visualization images and encodes them into an MP4. |
+| [Mask2Former Swin-L, Mapillary Vistas](https://huggingface.co/facebook/mask2former-swin-large-mapillary-vistas-panoptic) | Runs on RGB images and produces semantic/panoptic predictions. It does not process LiDAR. |
+| PNK preprocessing | Deskews `LIDAR_TOP` with per-point timestamps and NAV poses, aligns scans to labeled timestamps, and records camera health/synchronization evidence. |
+| PNK reference annotations | Supply 3D boxes. The run audits/resolves heading where supported; it does **not** run CenterPoint. |
+| T4Dataset adapter | Maps image and reference-label outputs into the schema consumed by METEOR. |
+| METEOR Autolabel Factory | Converts general-purpose annotations into downstream task targets, including occupancy-flow output in this run. |
+| OpenCV renderer | Writes per-frame visualizations and encodes them into MP4. |
 
-## Integrated run
+### PNK run evidence
 
 **Session:** `20260301_1429_VF6_01_1772350177_1772350814`<br>
 **Label segment:** `290_1772350499_1772350516`<br>
-**Raw data:** `D:\mentor_data\PNKData\20260301_1429_VF6_01_1772350177_1772350814`
 
 | Evidence | Result |
 |---|---:|
@@ -68,16 +85,16 @@ PNK raw data
 | Labeled samples | 86 |
 | Camera views processed by Mask2Former | 688 / 688 |
 | Views flagged as possible freeze | 252 / 688 |
-| Views marked usable for cross-modal checks | 436 / 688 |
+| Views usable for cross-modal checks | 436 / 688 |
 | General annotations: `surface_ann` | 4,695 |
 | General annotations: `object_ann` | 9,132 |
 | General annotations: `sample_annotation` | 10,364 |
 | Occupancy-flow targets | 86 frames; 88,325 supervised BEV cells |
-| Training handoff smoke check | Completed; no validation split was available |
+| Training handoff smoke check | Completed; no validation split available |
 
-The 3D annotations come from the PNK reference labels. The training smoke check verifies that data reaches the trainer; it is not a model-quality evaluation. No independent 2D ground truth was available for accuracy metrics on this session.
+The 3D annotations come from PNK reference labels. The training smoke check verifies that data reaches the trainer; it is not a model-quality evaluation. No independent 2D ground truth was available for this session.
 
-## Reproduce the run
+### Run the PNK pipeline
 
 After setting up the environment described in the [PNK runner guide](pnk_top_autolabel/README.md), run:
 
@@ -85,18 +102,11 @@ After setting up the environment described in the [PNK runner guide](pnk_top_aut
 & .\pnk_top_autolabel\run_full.ps1
 ```
 
-The default run uses the session and label segment listed above. It reads `LIDAR_TOP`, the eight available camera streams, NAV poses, and the date-matched `Calib_2`. Raw sensor files and source labels are not modified.
+The default run reads the session above, the eight available camera streams, `LIDAR_TOP`, NAV poses, and date-matched `Calib_2`. It does not modify raw sensor files or source labels.
 
-## Repository guides
+## Guides
 
 - [PNK preprocessing and autolabel summary](docs/PNK_PREPROCESSING_AUTOLABEL_SUMMARY.md)
 - [Dataset overview](docs/DATASET_OVERVIEW.md)
 - [PNK runner guide](pnk_top_autolabel/README.md)
-- [METEOR upstream repository](https://github.com/tier4/METEOR)
-
-## Current limitations
-
-- CoMET source code is not available in this repository; this pilot uses an open-source replacement.
-- PNK 3D reference boxes are passed through the adapter; CenterPoint inference has not been evaluated here.
-- Camera/LiDAR calibration still needs further validation. Some views are flagged for possible freeze and are not suitable as reliable cross-modal evidence.
-- Generated annotations are pseudo-labels. The run verifies the pipeline and schema handoff, not accuracy against independent ground truth or full completion of all METEOR task labels.
+- [METEOR upstream repository and reference visualizations](https://github.com/tier4/METEOR)

@@ -5,6 +5,12 @@ out/
 *.onnx
 *.engine
 *.pnk_e2e
+# Local inference artifacts; only reviewed NavSim previews under docs/media are shared.
+navsim_visuals/output/
+# Superseded PNK screenshots. Remove from the Git index before these rules take effect.
+docs/media/pnk_top_e2e_frame.png
+docs/media/pnk_lidar_top_bev.png
+docs/media/pnk_camera_projection_review.jpg
 
 # media (README media under docs/media/ is tracked explicitly)
 *.mp4
